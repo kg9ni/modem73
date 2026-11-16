@@ -64,7 +64,9 @@ Hit "Start microphone" to begin decoding
 
 
 ### Windows?
-Windows port: https://github.com/RFnexus/modem73-win | Releases: https://github.com/RFnexus/modem73-win/releases/
+Upstream Windows port: https://github.com/RFnexus/modem73-win | Releases: https://github.com/RFnexus/modem73-win/releases/
+
+To ship **this fork** (VARA ports + `RETRIES`) as a Windows zip without building on a PC, see [`packaging/windows/README.md`](packaging/windows/README.md). Short version: fork `modem73-win` under your account, apply `packaging/windows/modem73-win-vara.patch`, then run the repo’s GitHub Actions release workflow.
 
 
 
