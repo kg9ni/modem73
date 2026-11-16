@@ -1,5 +1,7 @@
 # VARA Control Port (linbpq64)
 
+This feature is part of the **[kg9ni/modem73](https://github.com/kg9ni/modem73)** fork of upstream [RFnexus/modem73](https://github.com/RFnexus/modem73) 2.5.0. Stock upstream builds do not include these ports. Windows zip: [v2.5.2-vara](https://github.com/kg9ni/modem73-win/releases/tag/v2.5.2-vara).
+
 modem73 can expose a **VARA-compatible command/data TCP interface** so [linbpq64](https://github.com/g8bpq/linbpq) can drive it with `DRIVER=VARA`, the same way it drives [xara](https://github.com/kg9ni/xara).
 
 This is a **host-API** compatibility layer. Over the air, sessions use modem73 framing (`V73…`), not the VARA HF/FM physical layer. Two modem73 stations with the VARA port enabled can connect to each other; they will not interoperate with real VARA or xara on RF.

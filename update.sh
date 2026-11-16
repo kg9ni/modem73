@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 #
 # modem73 update script
-# https://github.com/RFnexus/modem73
+# https://github.com/kg9ni/modem73
 #
 
 set -e
 
-REPO_URL="https://github.com/RFnexus/modem73.git"
+REPO_URL="https://github.com/kg9ni/modem73.git"
 INSTALL_DIR="${MODEM73_DIR:-$HOME/modem73}"
 BRANCH="${MODEM73_BRANCH:-master}"
 
