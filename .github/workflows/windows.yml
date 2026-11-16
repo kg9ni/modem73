@@ -1,0 +1,154 @@
+# Fallback Windows zip for the kg9ni VARA fork.
+# Primary path is kg9ni/modem73-win Actions; this workflow builds from that
+# tree (or upstream) + packaging/windows/modem73-win-vara.patch when needed.
+name: Build Windows package (VARA)
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version (e.g. 2.5.0-vara). Tag v<version> is created when publishing.'
+        required: true
+        default: '2.5.0-vara'
+      publish:
+        description: 'Publish a GitHub Release on kg9ni/modem73 with the win64 zip'
+        type: boolean
+        required: false
+        default: true
+      win_repo:
+        description: 'Windows port repo to check out (owner/name)'
+        required: true
+        default: 'kg9ni/modem73-win'
+
+permissions:
+  contents: write
+
+env:
+  LLVM_MINGW: llvm-mingw-20260616-ucrt-ubuntu-22.04-x86_64
+
+jobs:
+  build-win:
+    runs-on: ubuntu-24.04
+    outputs:
+      version: ${{ steps.ver.outputs.version }}
+    steps:
+      - id: ver
+        run: |
+          V="${{ github.event.inputs.version }}"
+          echo "version=${V}" >> "$GITHUB_OUTPUT"
+          echo "Building Windows package version ${V}"
+
+      - name: Checkout kg9ni/modem73 (for VARA patch)
+        uses: actions/checkout@v4
+        with:
+          path: m73
+
+      - name: Checkout Windows port
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ github.event.inputs.win_repo }}
+          path: m73win
+
+      - name: Apply VARA patch if missing
+        run: |
+          if [[ -f m73win/vara_port.hh ]]; then
+            echo "vara_port.hh already present — assuming VARA is on the win branch"
+          else
+            chmod +x m73/packaging/windows/apply-vara-to-modem73-win.sh
+            m73/packaging/windows/apply-vara-to-modem73-win.sh "$PWD/m73win"
+          fi
+          test -f m73win/vara_port.hh
+          grep -q '--vara-port' m73win/kiss_tnc.cc
+
+      - name: Install toolchain
+        working-directory: m73win
+        run: |
+          curl -sL -o llvm-mingw.tar.xz \
+            "https://github.com/mstorsjo/llvm-mingw/releases/download/20260616/${LLVM_MINGW}.tar.xz"
+          tar xf llvm-mingw.tar.xz
+          echo "$PWD/${LLVM_MINGW}/bin" >> "$GITHUB_PATH"
+
+      - name: Cache Hamlib
+        id: hamlib-cache
+        uses: actions/cache@v4
+        with:
+          path: m73win/deps/hamlib
+          key: hamlib-4.6.5-${{ env.LLVM_MINGW }}-vara
+
+      - name: Build Hamlib
+        if: steps.hamlib-cache.outputs.cache-hit != 'true'
+        working-directory: m73win
+        run: ./build-hamlib-win.sh
+
+      - name: Build
+        working-directory: m73win
+        run: make -j"$(nproc)" VERSION="${{ steps.ver.outputs.version }}"
+
+      - name: Verify Hamlib support is compiled in
+        working-directory: m73win
+        run: |
+          strings modem73.exe | grep -q "Hamlib" || {
+            echo "::error::modem73.exe has no Hamlib support - build silently lost it"
+            exit 1
+          }
+
+      - name: Smoke test
+        timeout-minutes: 8
+        working-directory: m73win
+        env:
+          WINEDEBUG: -all
+        run: |
+          sudo DEBIAN_FRONTEND=noninteractive apt-get update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends wine
+          file modem73.exe
+          timeout -k 5 60 wine modem73.exe --help 2>&1 | tee help.txt
+          grep -qi "vara-port" help.txt || { echo "::error::--vara-port missing from --help"; exit 1; }
+          grep -q "hamlib" help.txt || { echo "::error::hamlib missing from --ptt help"; exit 1; }
+          command -v wineserver >/dev/null && { wineserver -k || true; wineserver -w || true; } || true
+
+      - name: Package
+        working-directory: m73win
+        run: |
+          mkdir -p dist
+          cp modem73.exe dist/
+          cp README.md CONTROL_PORT.md LICENSE dist/
+          [[ -f VARA_PORT.md ]] && cp VARA_PORT.md dist/
+          (cd dist && zip "../modem73_${{ steps.ver.outputs.version }}_win64.zip" *)
+          sha256sum modem73_*_win64.zip | tee modem73_${{ steps.ver.outputs.version }}_win64.zip.sha256
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: modem73-win64-vara
+          path: |
+            m73win/modem73_*_win64.zip
+            m73win/modem73_*_win64.zip.sha256
+
+  release:
+    needs: build-win
+    if: github.event.inputs.publish == 'true'
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Attach to release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ needs.build-win.outputs.version }}
+          name: v${{ needs.build-win.outputs.version }} (Windows VARA)
+          body: |
+            Windows 64-bit zip of the kg9ni modem73 fork with VARA command/data ports + RETRIES.
+
+            Extract and run `modem73.exe`. For linbpq/BPQ:
+            `modem73.exe --headless --callsign YOURCALL --vara-port 8300`
+
+            See `VARA_PORT.md` inside the zip.
+          files: |
+            dist/modem73_*_win64.zip
+            dist/modem73_*_win64.zip.sha256
+          generate_release_notes: false
+          fail_on_unmatched_files: true
