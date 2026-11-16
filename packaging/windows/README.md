@@ -29,38 +29,30 @@ kept in the Project store under `artifacts/`, not in git.
 
 ## Recommended shipping path (for Ernie)
 
-### A. One-time: own a Windows packaging repo
+### A. Primary: `kg9ni/modem73-win` (fork exists)
 
-1. Open https://github.com/RFnexus/modem73-win
-2. Click **Fork** → create **`kg9ni/modem73-win`** (same account as this Linux fork).
-3. Clone it on any machine with git:
+Repo: https://github.com/kg9ni/modem73-win
+
+1. Ensure the VARA patch is on that repo’s `master` (or a merged PR). Apply locally if needed:
 
 ```bash
 git clone https://github.com/kg9ni/modem73-win.git
-cd modem73-win
+./packaging/windows/apply-vara-to-modem73-win.sh ./modem73-win
+# then commit + push on the win repo
 ```
 
-4. Apply the VARA patch from this repo:
+2. On https://github.com/kg9ni/modem73-win → **Actions** → **Build Windows package** → **Run workflow** (publish on).
+3. If Actions are disabled on the fork: open the Actions tab once and click **I understand my workflows, go ahead and enable them**.
+4. Send your friend the Release zip from https://github.com/kg9ni/modem73-win/releases
 
-```bash
-# From a checkout of kg9ni/modem73:
-git -C /path/to/modem73-win apply /path/to/modem73/packaging/windows/modem73-win-vara.patch
-```
+### A2. Fallback: build from this Linux repo
 
-Or run:
+If the win-fork Actions are unavailable, this repo has **Build Windows package (VARA)** (`.github/workflows/windows.yml`):
 
-```bash
-./packaging/windows/apply-vara-to-modem73-win.sh /path/to/modem73-win
-```
-
-5. Commit, push, then either:
-   - **GitHub Actions (preferred):** Actions → **Build Windows package** → Run workflow
-     (same as upstream `main_win.yml`: llvm-mingw, Hamlib, zip release), or
-   - Tag `vX.Y.Z` to publish a Release automatically.
-
-6. Send your friend the Release asset  
-   `modem73_<version>_win64.zip`  
-   from `https://github.com/kg9ni/modem73-win/releases`.
+1. Open https://github.com/kg9ni/modem73/actions
+2. Select **Build Windows package (VARA)** → **Run workflow**
+3. Version e.g. `2.5.0-vara`, publish enabled, win repo `kg9ni/modem73-win`
+4. The zip appears on https://github.com/kg9ni/modem73/releases
 
 ### B. Friend install (no build)
 
