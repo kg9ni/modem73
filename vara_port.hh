@@ -910,11 +910,21 @@ private:
                         say_locked(ptt ? "PTT ON" : "PTT OFF");
                     }
                 }
+                // Reconcile announced BUSY to RF/session state — same as xara:
+                // compare against busy_announced_ (not a separate sensor latch).
+                // Host-attach and CHAT ON toggle BUSY ON once; the next tick
+                // must clear it when the channel is actually quiet, or linbpq
+                // never sends CONNECT ("Sorry, Can't Connect - Channel is busy").
+                // While Calling/Answering/Connected, force busy like xara's
+                // non-Listen forced hang.
                 if (hooks_.is_busy) {
                     bool busy = hooks_.is_busy();
-                    if (busy != last_busy_) {
-                        last_busy_ = busy;
+                    if (state_ == State::Calling || state_ == State::Answering ||
+                        state_ == State::Connected)
+                        busy = true;
+                    if (busy != busy_announced_) {
                         busy_announced_ = busy;
+                        last_busy_ = busy;
                         say_locked(busy ? "BUSY ON" : "BUSY OFF");
                     }
                 }

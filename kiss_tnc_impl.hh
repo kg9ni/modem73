@@ -2754,6 +2754,27 @@ public:
         return std::chrono::steady_clock::now() < tx_lockout_until_;
     }
 
+    // Instantaneous channel busy for VARA BUSY ON/OFF (linbpq gating).
+    // Matches CSMA "occupied" sense: RX lockout/DCD, or THRESHOLD mode with
+    // level above carrier_threshold_db. Does NOT use occupancy EMA residue
+    // (channel_occupancy()>0 stays true long after a quiet channel).
+    bool channel_is_busy() {
+        if (is_receiving()) return true;
+        bool csma_on = false;
+        bool sync_only = false;
+        float thresh = -30.0f;
+        int sense_ms = 100;
+        {
+            std::lock_guard<std::mutex> lock(config_mutex_);
+            csma_on = config_.csma_enabled;
+            sync_only = config_.csma_sync_only;
+            thresh = config_.carrier_threshold_db;
+            sense_ms = config_.carrier_sense_ms;
+        }
+        if (!csma_on || sync_only || !audio_) return false;
+        return audio_->instant_level_db(sense_ms) > thresh;
+    }
+
     int get_client_count() const {
         std::lock_guard<std::mutex> lock(clients_mutex_);
         return clients_.size();

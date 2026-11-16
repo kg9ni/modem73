@@ -284,7 +284,7 @@ index 5452de3..9e097da 100644
 +            };
 +            vh.is_ptt = [&tnc]() { return tnc.is_transmitting(); };
 +            vh.is_busy = [&tnc]() {
-+                return tnc.is_receiving() || tnc.channel_occupancy() > 0;
++                return tnc.channel_is_busy();
 +            };
 +            vh.payload_capacity = [&tnc]() {
 +                return (size_t)std::max(16, tnc.get_payload_size());
@@ -368,6 +368,31 @@ index 6540c7a..64f46e0 100644
              auto kiss_frame = KISSParser::wrap(payload);
  
              std::lock_guard<std::mutex> lock(clients_mutex_);
+@@ -2748,6 +2755,28 @@ private:
+     bool is_receiving() const {
+         std::lock_guard<std::mutex> lock(lockout_mutex_);
+         return std::chrono::steady_clock::now() < tx_lockout_until_;
+     }
++
++    // Instantaneous channel busy for VARA BUSY ON/OFF (linbpq gating).
++    bool channel_is_busy() {
++        if (is_receiving()) return true;
++        bool csma_on = false;
++        bool sync_only = false;
++        float thresh = -30.0f;
++        int sense_ms = 100;
++        {
++            std::lock_guard<std::mutex> lock(config_mutex_);
++            csma_on = config_.csma_enabled;
++            sync_only = config_.csma_sync_only;
++            thresh = config_.carrier_threshold_db;
++            sense_ms = config_.carrier_sense_ms;
++        }
++        if (!csma_on || sync_only || !audio_) return false;
++        return audio_->instant_level_db(sense_ms) > thresh;
++    }
+ 
+     int get_client_count() const {
 diff --git a/tnc_ui_state.hh b/tnc_ui_state.hh
 index 959efe8..9d89b8f 100644
 --- a/tnc_ui_state.hh
@@ -1300,11 +1325,21 @@ index 0000000..f383aca
 +                        say_locked(ptt ? "PTT ON" : "PTT OFF");
 +                    }
 +                }
++                // Reconcile announced BUSY to RF/session state — same as xara:
++                // compare against busy_announced_ (not a separate sensor latch).
++                // Host-attach and CHAT ON toggle BUSY ON once; the next tick
++                // must clear it when the channel is actually quiet, or linbpq
++                // never sends CONNECT ("Sorry, Can't Connect - Channel is busy").
++                // While Calling/Answering/Connected, force busy like xara's
++                // non-Listen forced hang.
 +                if (hooks_.is_busy) {
 +                    bool busy = hooks_.is_busy();
-+                    if (busy != last_busy_) {
-+                        last_busy_ = busy;
++                    if (state_ == State::Calling || state_ == State::Answering ||
++                        state_ == State::Connected)
++                        busy = true;
++                    if (busy != busy_announced_) {
 +                        busy_announced_ = busy;
++                        last_busy_ = busy;
 +                        say_locked(busy ? "BUSY ON" : "BUSY OFF");
 +                    }
 +                }

@@ -2157,7 +2157,7 @@ int main(int argc, char** argv) {
             };
             vh.is_ptt = [&tnc]() { return tnc.is_transmitting(); };
             vh.is_busy = [&tnc]() {
-                return tnc.is_receiving() || tnc.channel_occupancy() > 0;
+                return tnc.channel_is_busy();
             };
             vh.payload_capacity = [&tnc]() {
                 return (size_t)std::max(16, tnc.get_payload_size());

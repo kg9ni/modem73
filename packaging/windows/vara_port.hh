@@ -69,6 +69,7 @@ public:
         std::function<size_t()> payload_capacity;
         std::function<void(float)> set_drive; // linear 0.05..1.0
         std::function<float()> get_drive;
+        std::function<void(const std::string&)> log; // modem73 UI / stderr
     };
 
     VaraPort(int cmd_port, const std::string& bind_address, uint32_t retries, Hooks hooks)
@@ -149,6 +150,16 @@ public:
     uint32_t retries() const {
         std::lock_guard<std::mutex> lock(mu_);
         return retries_;
+    }
+
+    // Hot-update the configured connect-attempt budget (GUI / saved settings).
+    // Updates both the live value and the RETRIES 0 restore baseline.
+    void set_retries(uint32_t n) {
+        std::lock_guard<std::mutex> lock(mu_);
+        if (n >= 1 && n <= 255) {
+            retries_ = n;
+            saved_retries_ = n;
+        }
     }
 
 private:
@@ -718,6 +729,12 @@ private:
         state_ = State::Calling;
         connect_attempts_ = 0;
         say_locked("OK");
+        // xara/VARA raise BUSY while an outbound call is in progress.
+        if (!busy_announced_) {
+            busy_announced_ = true;
+            last_busy_ = true;
+            say_locked("BUSY ON");
+        }
         // First attempt immediately; further attempts up to RETRIES.
         attempt_connect_locked();
     }
@@ -726,13 +743,37 @@ private:
         if (state_ != State::Calling) return;
         if (connect_attempts_ >= retries_) {
             // Exhausted user/host RETRIES — give up like xara/VARA.
-            finish_disconnect_locked(false);
+            fail_calling_locked();
             return;
         }
         connect_attempts_++;
         send_conn_locked(1, local_call_, peer_call_);
         next_retry_ = std::chrono::steady_clock::now() +
                       std::chrono::milliseconds(CONNECT_RETRY_MS);
+    }
+
+    // Report a failed outbound call with a complete peer callsign, then
+    // DISCONNECTED (+ BUSY OFF). linbpq prints "VARA} Failure with <call>";
+    // modem73 mirrors that wording on its own log so the callsign is intact.
+    void fail_calling_locked() {
+        std::string peer = shown_call(peer_call_);
+        if (peer.empty())
+            peer = shown_call(local_call_);
+        if (peer.empty())
+            peer = "?";
+        log_locked("Failure with " + peer);
+        bool clear_busy = busy_announced_;
+        finish_disconnect_locked(false);
+        if (clear_busy) {
+            busy_announced_ = false;
+            last_busy_ = false;
+            say_locked("BUSY OFF");
+        }
+    }
+
+    void log_locked(const std::string& msg) {
+        if (hooks_.log) hooks_.log(msg);
+        else std::cerr << "VARA: " << msg << std::endl;
     }
 
     bool is_mycall_locked(const std::string& c) const {
@@ -825,11 +866,13 @@ private:
     void finish_disconnect_locked(bool /*abort*/) {
         bool was = state_ == State::Connected || state_ == State::Calling ||
                    state_ == State::Answering;
+        // Keep callsigns until after DISCONNECTED is queued so any log/line
+        // that still needs the peer sees a complete callsign.
         state_ = listen_ ? State::Listen : State::Idle;
         connect_attempts_ = 0;
+        if (was) say_locked("DISCONNECTED");
         peer_call_.clear();
         local_call_.clear();
-        if (was) say_locked("DISCONNECTED");
     }
 
     void pump_tx_locked() {
@@ -884,11 +927,21 @@ private:
                         say_locked(ptt ? "PTT ON" : "PTT OFF");
                     }
                 }
+                // Reconcile announced BUSY to RF/session state — same as xara:
+                // compare against busy_announced_ (not a separate sensor latch).
+                // Host-attach and CHAT ON toggle BUSY ON once; the next tick
+                // must clear it when the channel is actually quiet, or linbpq
+                // never sends CONNECT ("Sorry, Can't Connect - Channel is busy").
+                // While Calling/Answering/Connected, force busy like xara's
+                // non-Listen forced hang.
                 if (hooks_.is_busy) {
                     bool busy = hooks_.is_busy();
-                    if (busy != last_busy_) {
-                        last_busy_ = busy;
+                    if (state_ == State::Calling || state_ == State::Answering ||
+                        state_ == State::Connected)
+                        busy = true;
+                    if (busy != busy_announced_) {
                         busy_announced_ = busy;
+                        last_busy_ = busy;
                         say_locked(busy ? "BUSY ON" : "BUSY OFF");
                     }
                 }
