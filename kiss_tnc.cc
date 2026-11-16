@@ -1477,7 +1477,7 @@ int main(int argc, char** argv) {
         std::unique_ptr<ControlPort> ctrl;
         std::unique_ptr<VaraPort> vara;
 #ifdef WITH_UI
-        auto apply_ui_settings = [&tnc, &ctrl](TNCUIState& state) {
+        auto apply_ui_settings = [&tnc, &ctrl, &vara](TNCUIState& state) {
             TNCConfig new_config = tnc.get_config();
             new_config.modem_type = state.modem_type_index;
             new_config.mfsk_mode = state.mfsk_mode_index;
@@ -1532,8 +1532,12 @@ int main(int argc, char** argv) {
             new_config.gpio_chip = state.gpio_chip;
             new_config.gpio_line = state.gpio_line;
             new_config.gpio_active_low = state.gpio_active_low;
+            new_config.vara_port = state.vara_port;
+            new_config.vara_bind_address = state.vara_bind_address;
+            new_config.vara_retries = state.vara_retries;
 
             tnc.update_config(new_config);
+            if (vara) vara->set_retries((uint32_t)state.vara_retries);
             if (ctrl) ctrl->notify_config_changed();
         };
 #endif
@@ -2165,6 +2169,9 @@ int main(int argc, char** argv) {
             };
             vh.get_drive = [&tnc]() {
                 return tnc.get_config().tx_drive;
+            };
+            vh.log = [](const std::string& msg) {
+                ui_log(std::string("VARA: ") + msg);
             };
             vara = std::make_unique<VaraPort>(config.vara_port, config.vara_bind_address,
                                               (uint32_t)config.vara_retries, std::move(vh));

@@ -33,6 +33,8 @@ vara_bind_address=127.0.0.1
 vara_retries=15
 ```
 
+In the TUI: **CONFIG → Network** has **VARA Port**, **VARA Bind**, and **VARA Retries**. Port/bind changes need a restart; retries apply immediately. The STATUS network pane shows the current VARA listen ports.
+
 The existing JSON control port (`8073`) and KISS port (`8001`) are unchanged.
 
 ## linbpq64
