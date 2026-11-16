@@ -57,8 +57,11 @@ jobs:
             chmod +x m73/packaging/windows/apply-vara-to-modem73-win.sh
             m73/packaging/windows/apply-vara-to-modem73-win.sh "$PWD/m73win"
           fi
+          # Keep Winsock port in sync with Linux RETRIES wiring.
+          cp -f m73/packaging/windows/vara_port.hh m73win/vara_port.hh
           test -f m73win/vara_port.hh
           grep -q '--vara-port' m73win/kiss_tnc.cc
+          grep -q 'on_retries_changed' m73win/vara_port.hh
 
       - name: Install toolchain
         working-directory: m73win

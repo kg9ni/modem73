@@ -67,6 +67,16 @@ When linbpq (or another host) issues `CONNECT mycall remote`, modem73 transmits 
 
 Local default if the host never sends `RETRIES`: `--vara-retries` / `vara_retries` (default 15).
 
+Host `RETRIES`, the GUI **VARA Retries** field, saved `vara_retries`, and `--vara-retries` all update the **same** live connect budget. STATUS → Network → Retries should match what CONNECT will use.
+
+### Set / verify (Ernie)
+
+1. In modem73: **CONFIG → Network → VARA Retries** → type `20` → Enter (applies immediately; also saved).
+2. Or in linbpq `CONFIG` put `RETRIES 20` (forwarded on attach).
+3. Or start with `--vara-retries 20`.
+4. Check **STATUS → Retries** shows `20`, and the modem log line when VARA ports start includes `retries 20`.
+5. On an unanswered call, the log should show `VARA: Calling 1/20` … `VARA: Calling 20/20` then `VARA: Failure with …` — not stop at `15/15`.
+
 ## Command highlights
 
 Framing: one command per line ending in `\r` (`\n` ignored). Replies end with `\r`.
