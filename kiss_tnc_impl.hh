@@ -2611,6 +2611,14 @@ public:
             }
         }
 
+        // Keep VARA host settings in the live TNC config so get_config() and any
+        // later apply path see the user-set connect budget (not the startup default).
+        if (new_config.vara_retries >= 1 && new_config.vara_retries <= 255)
+            config_.vara_retries = new_config.vara_retries;
+        if (new_config.vara_port >= 0 && new_config.vara_port <= 65534)
+            config_.vara_port = new_config.vara_port;
+        config_.vara_bind_address = new_config.vara_bind_address;
+
         return rejected;
     }
     

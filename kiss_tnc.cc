@@ -2173,12 +2173,39 @@ int main(int argc, char** argv) {
             vh.log = [](const std::string& msg) {
                 ui_log(std::string("VARA: ") + msg);
             };
+            // Host RETRIES (linbpq InitScript) must update GUI/STATUS too; otherwise
+            // the next apply_settings() would clobber the live budget back to the
+            // stale ui_state default of 15.
+            vh.on_retries_changed = [&tnc](uint32_t n) {
+#ifdef WITH_UI
+                if (g_ui_state) {
+                    int ni = (int)n;
+                    g_ui_state->post_ui_task([ni](TNCUIState& s) {
+                        if (s.vara_retries != ni) {
+                            s.vara_retries = ni;
+                            s.refresh_settings_snapshot();
+                        }
+                    });
+                }
+#endif
+                TNCConfig c = tnc.get_config();
+                if (c.vara_retries != (int)n) {
+                    c.vara_retries = (int)n;
+                    tnc.update_config(c);
+                }
+            };
             vara = std::make_unique<VaraPort>(config.vara_port, config.vara_bind_address,
                                               (uint32_t)config.vara_retries, std::move(vh));
             if (!vara->start()) {
                 std::cerr << "Error: failed to start VARA ports" << std::endl;
                 return 1;
             }
+            // Belt-and-suspenders: apply the configured budget again after start so
+            // GUI/saved/--vara-retries cannot diverge from the live CONNECT path.
+            vara->set_retries((uint32_t)config.vara_retries);
+#ifdef WITH_UI
+            ui_state.vara_retries = (int)vara->retries();
+#endif
             tnc.consume_rx = [&vara](const std::vector<uint8_t>& payload) -> bool {
                 return vara && vara->handle_rx(payload);
             };

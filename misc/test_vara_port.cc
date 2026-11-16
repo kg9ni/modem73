@@ -199,11 +199,94 @@ int main() {
         return 1;
     }
 
-    // Successful CONNECT path on a third port pair
+    // Configured budget must be used: GUI/set_retries(20) or host RETRIES 20
+    // must produce 20 outbound CONN_REQ frames (not the default 15).
     v2.stop();
     close(cmd);
     close(data);
-    int port3 = port + 2;
+    txq.clear();
+    logs.clear();
+    uint32_t synced = 0;
+    h.on_retries_changed = [&](uint32_t n) { synced = n; };
+    int port_r = port + 2;
+    for (; port_r < 18400; port_r += 2) {
+        VaraPort probe(port_r, "127.0.0.1", 15, h);
+        if (probe.start()) { probe.stop(); break; }
+    }
+    VaraPort vr(port_r, "127.0.0.1", 15, h); // start at default 15
+    vr.set_connect_retry_ms_for_test(30);
+    if (!vr.start()) {
+        fprintf(stderr, "FAIL: start retries-budget path\n");
+        return 1;
+    }
+    cmd = connect_port(port_r);
+    data = connect_port(port_r + 1);
+    if (cmd < 0 || data < 0) {
+        fprintf(stderr, "FAIL: connect retries-budget path\n");
+        return 1;
+    }
+    {
+        auto b = read_line(cmd);
+        if (b == "BUSY ON") read_line(cmd, 1500);
+    }
+    send_all(cmd, "MYCALL N0CALL\r");
+    read_line(cmd);
+    // Host RETRIES (linbpq) path
+    send_all(cmd, "RETRIES 20\r");
+    read_line(cmd);
+    if (vr.retries() != 20 || synced != 20) {
+        fprintf(stderr, "FAIL: host RETRIES 20 not live (retries=%u synced=%u)\n",
+                vr.retries(), synced);
+        return 1;
+    }
+    // GUI path: set_retries also becomes the RETRIES 0 baseline
+    vr.set_retries(20);
+    if (vr.retries() != 20) {
+        fprintf(stderr, "FAIL: set_retries 20\n");
+        return 1;
+    }
+    size_t tx_before = txq.size();
+    send_all(cmd, "CONNECT N0CALL N1CALL\r");
+    if (read_line(cmd) != "OK") {
+        fprintf(stderr, "FAIL: CONNECT retries-budget\n");
+        return 1;
+    }
+    bool saw_disc20 = false;
+    for (int i = 0; i < 200 && !saw_disc20; ++i) {
+        auto l = read_line(cmd, 50);
+        if (l == "DISCONNECTED") saw_disc20 = true;
+    }
+    if (!saw_disc20) {
+        fprintf(stderr, "FAIL: no DISCONNECTED after 20-attempt budget\n");
+        return 1;
+    }
+    size_t conn_reqs = 0;
+    for (size_t i = tx_before; i < txq.size(); ++i) {
+        auto& f = txq[i];
+        if (f.size() >= 4 && f[0] == 'V' && f[1] == '7' && f[2] == '3' && f[3] == 1)
+            conn_reqs++;
+    }
+    if (conn_reqs != 20) {
+        fprintf(stderr, "FAIL: expected 20 CONN_REQ got %zu (default 15 bug?)\n",
+                conn_reqs);
+        return 1;
+    }
+    bool saw_call_log = false;
+    for (auto& m : logs) {
+        if (m == "Calling 20/20") saw_call_log = true;
+    }
+    if (!saw_call_log) {
+        fprintf(stderr, "FAIL: missing Calling 20/20 log\n");
+        return 1;
+    }
+    printf("OK retries budget uses configured 20 (not default 15)\n");
+    h.on_retries_changed = nullptr;
+    vr.stop();
+    close(cmd);
+    close(data);
+
+    // Successful CONNECT path on a third port pair
+    int port3 = port_r + 2;
     for (; port3 < 18400; port3 += 2) {
         VaraPort probe(port3, "127.0.0.1", 3, h);
         if (probe.start()) { probe.stop(); break; }

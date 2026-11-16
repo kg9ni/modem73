@@ -70,6 +70,9 @@ public:
         std::function<void(float)> set_drive; // linear 0.05..1.0
         std::function<float()> get_drive;
         std::function<void(const std::string&)> log; // modem73 UI / stderr
+        // Fired whenever the live connect-attempt budget changes (host RETRIES
+        // or set_retries) so GUI/STATUS/saved settings stay in sync.
+        std::function<void(uint32_t)> on_retries_changed;
     };
 
     VaraPort(int cmd_port, const std::string& bind_address, uint32_t retries, Hooks hooks)
@@ -155,11 +158,25 @@ public:
     // Hot-update the configured connect-attempt budget (GUI / saved settings).
     // Updates both the live value and the RETRIES 0 restore baseline.
     void set_retries(uint32_t n) {
-        std::lock_guard<std::mutex> lock(mu_);
-        if (n >= 1 && n <= 255) {
+        if (n < 1 || n > 255) return;
+        uint32_t live = 0;
+        bool changed = false;
+        {
+            std::lock_guard<std::mutex> lock(mu_);
+            // GUI / saved settings become the new RETRIES-0 restore baseline.
+            changed = (retries_ != n) || (saved_retries_ != n);
             retries_ = n;
             saved_retries_ = n;
+            live = retries_;
         }
+        if (changed) notify_retries(live);
+    }
+
+    // Test helper: shorten the inter-attempt wait (default CONNECT_RETRY_MS).
+    void set_connect_retry_ms_for_test(int ms) {
+        std::lock_guard<std::mutex> lock(mu_);
+        if (ms >= 1 && ms <= CONNECT_RETRY_MS)
+            connect_retry_ms_ = ms;
     }
 
 private:
@@ -198,6 +215,7 @@ private:
     uint32_t bw_hz_ = 2300;
     uint32_t saved_retries_ = DEFAULT_RETRIES;
     uint32_t connect_attempts_ = 0;
+    int connect_retry_ms_ = CONNECT_RETRY_MS;
     Comp compression_ = Comp::Text;
     std::vector<std::string> mycalls_;
     std::string peer_call_;
@@ -498,7 +516,12 @@ private:
         return state_ == State::Idle || state_ == State::Listen;
     }
 
-    void handle_line_locked(const std::string& line) {
+    void handle_line_locked(std::string line) {
+        // Host scripts sometimes indent CONFIG lines; trim before matching.
+        while (!line.empty() && (line.front() == ' ' || line.front() == '\t'))
+            line.erase(line.begin());
+        while (!line.empty() && (line.back() == ' ' || line.back() == '\t'))
+            line.pop_back();
         if (line == "VERSION") {
             say_locked(VERSION_HF);
             return;
@@ -646,12 +669,23 @@ private:
         if (!v) return;
         double r = std::round(*v);
         if (r == 0.0) {
-            if (saved_retries_ > 0) retries_ = saved_retries_;
+            if (saved_retries_ > 0 && retries_ != saved_retries_) {
+                retries_ = saved_retries_;
+                // Callback must not re-enter VaraPort (kiss_tnc only touches UI/TNC config).
+                if (hooks_.on_retries_changed) hooks_.on_retries_changed(retries_);
+            }
             return;
         }
-        if (r < 0.0 || r > 255.0) return;
+        if (r < 1.0 || r > 255.0) return;
+        uint32_t n = (uint32_t)r;
+        if (n == retries_) return;
         saved_retries_ = retries_;
-        retries_ = (uint32_t)r;
+        retries_ = n;
+        if (hooks_.on_retries_changed) hooks_.on_retries_changed(retries_);
+    }
+
+    void notify_retries(uint32_t n) {
+        if (hooks_.on_retries_changed) hooks_.on_retries_changed(n);
     }
 
     void apply_drive_locked(const std::string& rest) {
@@ -746,10 +780,20 @@ private:
             fail_calling_locked();
             return;
         }
+        // Like xara: do not burn an attempt while the previous TX is still keyed.
+        // Defer until PTT drops so the budget matches audible RF tries.
+        if (hooks_.is_ptt && hooks_.is_ptt()) {
+            next_retry_ = std::chrono::steady_clock::now() +
+                          std::chrono::milliseconds(100);
+            return;
+        }
         connect_attempts_++;
+        char msg[64];
+        snprintf(msg, sizeof(msg), "Calling %u/%u", connect_attempts_, retries_);
+        log_locked(msg);
         send_conn_locked(1, local_call_, peer_call_);
         next_retry_ = std::chrono::steady_clock::now() +
-                      std::chrono::milliseconds(CONNECT_RETRY_MS);
+                      std::chrono::milliseconds(connect_retry_ms_);
     }
 
     // Report a failed outbound call with a complete peer callsign, then

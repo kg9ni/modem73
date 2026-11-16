@@ -31,5 +31,9 @@ else
   patch -d "$WIN_SRC" -p1 < "$PATCH"
 fi
 
-echo "VARA patch applied to $WIN_SRC"
+# Always refresh Winsock vara_port.hh from the regenerated copy so RETRIES
+# wiring stays in sync with Linux (patch body can lag).
+cp -f "$ROOT/packaging/windows/vara_port.hh" "$WIN_SRC/vara_port.hh"
+
+echo "VARA patch applied to $WIN_SRC (vara_port.hh refreshed)"
 echo "Next: cd \"$WIN_SRC\" && make -j\$(nproc)   # or push and run GitHub Actions"
