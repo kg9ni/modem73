@@ -80,11 +80,20 @@ int main() {
         fprintf(stderr, "FAIL: connect cmd/data\n");
         return 1;
     }
-    // BUSY toggle on attach
+    // xara-compatible attach pulse: BUSY ON then reconcile to OFF when quiet
+    // (is_busy hook returns false). Sticky BUSY ON here is what blocks linbpq.
     auto busy = read_line(cmd);
     if (busy != "BUSY ON" && busy != "BUSY OFF") {
         fprintf(stderr, "FAIL: expected BUSY, got '%s'\n", busy.c_str());
         return 1;
+    }
+    if (busy == "BUSY ON") {
+        auto clear = read_line(cmd, 1500);
+        if (clear != "BUSY OFF") {
+            fprintf(stderr, "FAIL: expected BUSY OFF after quiet reconcile, got '%s'\n",
+                    clear.c_str());
+            return 1;
+        }
     }
 
     send_all(cmd, "VERSION\r");
@@ -153,7 +162,10 @@ int main() {
         fprintf(stderr, "FAIL: reconnect\n");
         return 1;
     }
-    read_line(cmd); // BUSY
+    {
+        auto b = read_line(cmd); // attach BUSY pulse
+        if (b == "BUSY ON") read_line(cmd, 1500); // expect OFF when quiet
+    }
     send_all(cmd, "MYCALL N0CALL\r");
     read_line(cmd);
     send_all(cmd, "RETRIES 1\r");
@@ -203,7 +215,10 @@ int main() {
     }
     cmd = connect_port(port3);
     data = connect_port(port3 + 1);
-    read_line(cmd);
+    {
+        auto b = read_line(cmd);
+        if (b == "BUSY ON") read_line(cmd, 1500);
+    }
     send_all(cmd, "MYCALL N0CALL\r");
     read_line(cmd);
     size_t before = txq.size();
@@ -212,7 +227,14 @@ int main() {
         fprintf(stderr, "FAIL: CONNECT\n");
         return 1;
     }
-    read_line(cmd); // BUSY
+    // Outbound call forces BUSY ON (session hang); may already be queued.
+    {
+        auto b = read_line(cmd, 500);
+        if (b != "BUSY ON" && !b.empty()) {
+            fprintf(stderr, "FAIL: expected BUSY ON while calling, got '%s'\n", b.c_str());
+            return 1;
+        }
+    }
     std::this_thread::sleep_for(std::chrono::milliseconds(200));
     if (txq.size() < before + 1) {
         fprintf(stderr, "FAIL: no connect TX frame\n");

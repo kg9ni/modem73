@@ -81,8 +81,11 @@ Framing: one command per line ending in `\r` (`\n` ignored). Replies end with `\
 | `BW500` / `BW2300` / `BW2750` | Stored for `CONNECTED …` width reporting |
 | `CLEANTXBUFFER` | `BUFFEREMPTY` or `FAILED ` |
 | `IAMALIVE` | Emitted about every 60s while a host is attached |
+| `BUSY ON` / `OFF` | Channel/session busy for linbpq. Host attach pulses ON then OFF when quiet (xara-compatible). Stays ON while Calling/Connected or when CSMA hears a real busy channel. |
 
 One TCP client per command port and one per data port (second connection refused while busy). Dropping either side closes the pair.
+
+**linbpq note:** If the modem stays on `BUSY ON` while the frequency is empty, linbpq will not send `CONNECT` and prints `Sorry, Can't Connect - Channel is busy`. Meantime knobs: raise CSMA **Threshold** a few dB above the noise floor, or switch CSMA **Mode** to **SYNC** so only real modem73 signals count as busy.
 
 ## Gaps vs xara
 
