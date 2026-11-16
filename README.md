@@ -48,37 +48,67 @@ On fading/weaker HF paths, use ROBUST modes. For very weak signals or as a backu
 
 - KISS over TCP so it works with anything that speaks KISS: APRS clients, HamIRC, packet BBS software, Reticulum, custom applications
 - JSON control port API for status and configuration for writing your own programs
-- Optional VARA-compatible command/data ports so linbpq64 can attach with `DRIVER=VARA` (see `VARA_PORT.md`)
+- Optional VARA-compatible command/data ports so linbpq64 can attach with `DRIVER=VARA` (see `VARA_PORT.md`) — **this fork**
 - lightweight UI that runs straight from the terminal and headless mode for embedded use 
 
+## This fork (kg9ni) vs upstream
 
-### [5 minute quickstart guide](https://modem73.app/quickstart.html)
+This repository is **[kg9ni/modem73](https://github.com/kg9ni/modem73)**, a fork of upstream **[RFnexus/modem73](https://github.com/RFnexus/modem73) 2.5.0**.
+
+Use **this fork** when you need the VARA host API and related fixes. Use [upstream](https://github.com/RFnexus/modem73) for stock modem73 without those changes.
+
+What this fork adds on top of 2.5.0:
+
+| Area | Detail |
+|------|--------|
+| VARA command/data ports | TCP ports for linbpq `DRIVER=VARA` (default **8300** command / **8301** data). Host API only; over-the-air framing is still modem73. See [`VARA_PORT.md`](VARA_PORT.md). |
+| `RETRIES` | Host `RETRIES`, CLI `--vara-retries`, and GUI **CONFIG → Network → VARA Retries** share one live connect budget (default 15, matching xara HF). |
+| GUI Network settings | **CONFIG → Network** exposes **VARA Port**, **VARA Bind**, and **VARA Retries**. STATUS shows the listen ports and current retries. |
+| Busy / retries fixes | Sticky `BUSY ON` after host attach no longer blocks linbpq CONNECT on a quiet channel; configured retries above 15 are honored end-to-end. |
+
+Quick enable:
+
+```
+./modem73 --headless --callsign N0CALL --vara-port 8300
+```
+
+Or in the TUI: **CONFIG → Network** → set **VARA Port** to `8300` → restart. Full linbpq notes and troubleshooting live in [`VARA_PORT.md`](VARA_PORT.md).
+
+### [5 minute quickstart guide](QUICKSTART.md)
+
+Upstream HTML mirror (general modem73, not fork-specific): https://modem73.app/quickstart.html
 
 ## Installation
 
+Clone and build **this fork** (`kg9ni/modem73`). Paths that still say RFnexus below are labeled as upstream-only.
 
+Want to try a browser demo of stock modem73? Upstream WASM demo:  
+https://rfnexus.github.io/modem73-wasm-demo/  
+Hit "Start microphone" to begin decoding.
 
-Want to try out a demo of modem73 directly from your browser? Try it out here:
-https://rfnexus.github.io/modem73-wasm-demo/
-Hit "Start microphone" to begin decoding
+### Windows
 
+For **this fork** (VARA ports + `RETRIES` + Network GUI), download the latest kg9ni Windows release:
 
-### Windows?
-Upstream Windows port: https://github.com/RFnexus/modem73-win | Releases: https://github.com/RFnexus/modem73-win/releases/
+**[v2.5.2-vara](https://github.com/kg9ni/modem73-win/releases/tag/v2.5.2-vara)** — zip:  
+https://github.com/kg9ni/modem73-win/releases/download/v2.5.2-vara/modem73_2.5.2-vara_win64.zip
 
-To ship **this fork** (VARA ports + `RETRIES`) as a Windows zip without building on a PC, see [`packaging/windows/README.md`](packaging/windows/README.md). Short version: fork `modem73-win` under your account, apply `packaging/windows/modem73-win-vara.patch`, then run the repo’s GitHub Actions release workflow.
+Release index: https://github.com/kg9ni/modem73-win/releases
 
+How the Windows zip is built and shipped: [`packaging/windows/README.md`](packaging/windows/README.md).
 
+Upstream Windows port (no kg9ni VARA changes): https://github.com/RFnexus/modem73-win | https://github.com/RFnexus/modem73-win/releases/
 
 ### Android
-https://github.com/RFnexus/modem73-android
+
+Upstream Android port: https://github.com/RFnexus/modem73-android
 
 
 ## Building from source
 
 ### Linux
 
-On a system with `apt` or an Arch-based distro with `pacman`? Run the installer script:
+On a system with `apt` or an Arch-based distro with `pacman`? From a clone of **this** repo, run the installer script:
 ```
 ./install.sh
 ```
@@ -114,9 +144,9 @@ sudo apt install libhidapi-dev
 
 
 ```
-# Clone modem73
+# Clone this fork (kg9ni/modem73)
 
-git clone https://github.com/RFnexus/modem73
+git clone https://github.com/kg9ni/modem73
 
 # Build
 
@@ -135,7 +165,7 @@ Apple's default bundled ncurses is too old for the UI, so install Homebrew's and
 
 ```
 brew install ncurses
-git clone https://github.com/RFnexus/modem73
+git clone https://github.com/kg9ni/modem73
 cd modem73
 make
 ```
@@ -249,7 +279,7 @@ modem73 supports the [AIOC](https://github.com/skuep/AIOC) out of the box. To us
 modem73 supports Hamlib and rigctl for any rigctl supported radio for PTT. Set rigctl to your options and run `rigctld -m (your model) -s (serial baud rate) -r /dev/XXXX)`  The `d` at the end of `rigctl` tells rigctl to run in network mode, which is what modem73 will connect to.
 
 ### Reticulum
-Want to use modem73 with Reticulum? Check out the modem73interface
+Want to use modem73 with Reticulum? Check out the upstream modem73interface:  
 https://github.com/RFnexus/modem73interface
 
 Drop it into `~/.reticulum/interfaces/` and in your Reticulum config, add something like:
@@ -282,9 +312,9 @@ The Pi Zero 2 with its SoC can only support 1 decoder at a time. If you are tigh
 
 ## Updating
 
-modem73 comes included with a update utility `update.sh`
+modem73 includes an update utility `update.sh` that pulls from **this fork** (`kg9ni/modem73`).
 
-To update to the latest version:
+To update to the latest version of this fork:
 ```
 ./update.sh
 ```

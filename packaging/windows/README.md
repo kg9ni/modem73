@@ -3,15 +3,22 @@
 This folder prepares a **Windows 11 zip** of modem73 that includes the VARA
 command/data ports + `RETRIES` (same host API as Linux `VARA_PORT.md`).
 
-Upstream ships Windows builds from a **separate repo**, not from this Linux tree:
+**Current friend-facing release:**  
+[v2.5.2-vara](https://github.com/kg9ni/modem73-win/releases/tag/v2.5.2-vara)  
+Direct zip: https://github.com/kg9ni/modem73-win/releases/download/v2.5.2-vara/modem73_2.5.2-vara_win64.zip
+
+That build includes CONFIG → Network **VARA Port / Bind / Retries** (missing from v2.5.1-vara). Prefer it over older kg9ni zips and over upstream RFnexus Windows releases.
+
+Windows builds ship from a **separate repo**, not from this Linux tree:
 
 | Piece | URL |
 |-------|-----|
-| Upstream Windows port | https://github.com/RFnexus/modem73-win |
-| Upstream Windows releases (zip) | https://github.com/RFnexus/modem73-win/releases |
+| **This fork’s Windows releases** | https://github.com/kg9ni/modem73-win/releases |
 | This Linux fork (VARA source) | https://github.com/kg9ni/modem73 |
+| Upstream Windows port (no kg9ni VARA) | https://github.com/RFnexus/modem73-win |
+| Upstream Windows releases | https://github.com/RFnexus/modem73-win/releases |
 
-There is **no `.msi` / Setup.exe**. Official packages are a portable zip:
+There is **no `.msi` / Setup.exe**. Packages are a portable zip:
 
 `modem73_<version>_win64.zip` → `modem73.exe` + docs. Unzip and run.
 
@@ -20,7 +27,7 @@ There is **no `.msi` / Setup.exe**. Official packages are a portable zip:
 On Linux we:
 
 1. Took `RFnexus/modem73-win` @ v2.5.0 parity.
-2. Ported Winsock `vara_port.hh` + wired CLI/config/`RETRIES`.
+2. Ported Winsock `vara_port.hh` + wired CLI/config/`RETRIES` + Network GUI.
 3. Cross-compiled with `x86_64-w64-mingw32-g++`.
 4. Smoked `wine modem73.exe --help` (shows `--vara-port` / `--vara-retries`).
 
@@ -43,7 +50,7 @@ git clone https://github.com/kg9ni/modem73-win.git
 
 2. On https://github.com/kg9ni/modem73-win → **Actions** → **Build Windows package** → **Run workflow** (publish on).
 3. If Actions are disabled on the fork: open the Actions tab once and click **I understand my workflows, go ahead and enable them**.
-4. Send your friend the Release zip from https://github.com/kg9ni/modem73-win/releases
+4. Send your friend the Release zip from https://github.com/kg9ni/modem73-win/releases (currently **v2.5.2-vara**).
 
 ### A2. Fallback: build from this Linux repo
 
@@ -51,12 +58,12 @@ If the win-fork Actions are unavailable, this repo has **Build Windows package (
 
 1. Open https://github.com/kg9ni/modem73/actions
 2. Select **Build Windows package (VARA)** → **Run workflow**
-3. Version e.g. `2.5.0-vara`, publish enabled, win repo `kg9ni/modem73-win`
+3. Version e.g. `2.5.2-vara`, publish enabled, win repo `kg9ni/modem73-win`
 4. The zip appears on https://github.com/kg9ni/modem73/releases
 
 ### B. Friend install (no build)
 
-1. Download the zip from the kg9ni release (or the preview in Project `artifacts/`).
+1. Download https://github.com/kg9ni/modem73-win/releases/download/v2.5.2-vara/modem73_2.5.2-vara_win64.zip (or the preview in Project `artifacts/`).
 2. Right-click → **Extract All…** to a folder (e.g. `Documents\modem73`).
 3. Double-click `modem73.exe` (or run from Command Prompt).
 4. For linbpq / BPQ with `DRIVER=VARA`:
@@ -64,6 +71,8 @@ If the win-fork Actions are unavailable, this repo has **Build Windows package (
 ```text
 modem73.exe --headless --callsign YOURCALL --vara-port 8300
 ```
+
+Or GUI: **CONFIG → Network** → **VARA Port** `8300` → restart.
 
 Command port **8300**, data **8301**. See `VARA_PORT.md`.
 

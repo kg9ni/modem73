@@ -2,19 +2,28 @@
 
 modem73 is a free, open source software modem. It has configs for any setup, from line of sight UHF links over FM to HF propagation. This guide gets you running in under 5 minutes.
 
+**This document is for the [kg9ni/modem73](https://github.com/kg9ni/modem73) fork** of upstream [RFnexus/modem73](https://github.com/RFnexus/modem73) 2.5.0. The fork adds VARA command/data ports for linbpq, `RETRIES`, GUI Network VARA settings, and related busy/retries fixes. See the [README](README.md) and [`VARA_PORT.md`](VARA_PORT.md). For stock modem73 without those changes, use upstream.
+
 ## Step 1: Download & install
 
-The first step is to download either the source or compiled binary for your system from [modem73.app](https://modem73.app/index.html).
+Clone or download **this fork**:
 
-If you're building from source, follow along with the instructions in the README or run `install.sh` if you are on a Debian or Arch based system.
+```
+git clone https://github.com/kg9ni/modem73
+```
 
-For a precompiled build, find the release that matches your OS and architecture:
+Upstream site [modem73.app](https://modem73.app/index.html) still hosts general modem73 docs and Linux/package builds for the original project; those packages do **not** include this fork’s VARA changes. Prefer building from `kg9ni/modem73` (or the kg9ni Windows zip below) when you need VARA/linbpq support.
+
+If you're building from source, follow the README or run `install.sh` on a Debian or Arch based system (from a kg9ni clone).
+
+For a precompiled **upstream** `.deb` (no fork VARA features), match OS and architecture on modem73.app / RFnexus releases:
 
 - **Raspberry Pi** (Pi 5, Pi Zero 2): Debian 12 or Debian 13 `arm64`
 - **Everything else**: match your architecture. Builds are available for Ubuntu, Debian, and Mint.
-- **Windows**: see the separate Windows README and find the latest releases at [github.com/RFnexus/modem73-win/releases](https://github.com/RFnexus/modem73-win/releases)
+- **Windows (this fork):** use **[kg9ni/modem73-win v2.5.2-vara](https://github.com/kg9ni/modem73-win/releases/tag/v2.5.2-vara)**  
+  Direct zip: https://github.com/kg9ni/modem73-win/releases/download/v2.5.2-vara/modem73_2.5.2-vara_win64.zip
 
-Install the package with `apt` or your system's package manager:
+Install an upstream `.deb` with `apt` or your system's package manager:
 
 ```
 sudo apt install ./modem73_<version>_<arch>.deb
@@ -22,9 +31,21 @@ sudo apt install ./modem73_<version>_<arch>.deb
 
 ### Installing (Windows)
 
-Grab the latest build from the [modem73-win releases](https://github.com/RFnexus/modem73-win/releases). The Windows build is a separate fork, ported to Win32 APIs and PDCurses with LLM assisted tooling, so treat it as experimental. If you do not need serial PTT, running the upstream build under [WSL](https://learn.microsoft.com/en-us/windows/wsl/install) is the more stable path.
+For **this fork’s** VARA ports, `RETRIES`, and Network GUI, grab:
 
-To build it yourself, everything is vendored under `deps/` (aicodix DSP, PDCurses, hidapi, miniaudio, cJSON) and the exe is statically linked, so there is nothing external to install at build or run time. CM108 USB PTT is always enabled.
+https://github.com/kg9ni/modem73-win/releases/tag/v2.5.2-vara
+
+Unzip and run `modem73.exe`. Details: [`packaging/windows/README.md`](packaging/windows/README.md) and [`VARA_PORT.md`](VARA_PORT.md).
+
+```text
+modem73.exe --headless --callsign YOURCALL --vara-port 8300
+```
+
+Or in the GUI: **CONFIG → Network** → **VARA Port** `8300` → restart.
+
+Upstream Windows builds (no kg9ni VARA changes) are at [RFnexus/modem73-win/releases](https://github.com/RFnexus/modem73-win/releases). The Windows port uses Win32 APIs and PDCurses; treat native Windows as experimental. If you do not need serial PTT, running a Linux build under [WSL](https://learn.microsoft.com/en-us/windows/wsl/install) is often more stable.
+
+To build the Windows tree yourself (from [kg9ni/modem73-win](https://github.com/kg9ni/modem73-win)), everything is vendored under `deps/` and the exe is statically linked. CM108 USB PTT is always enabled.
 
 Native on Windows, from a MinGW64 shell after installing [MSYS2](https://www.msys2.org/):
 
@@ -33,15 +54,7 @@ pacman -S --needed make mingw-w64-x86_64-gcc
 make CXX=g++ CC=gcc
 ```
 
-Or cross compile from Linux:
-
-```
-# Debian/Ubuntu
-sudo apt install make g++-mingw-w64-x86-64-posix
-make
-```
-
-Either way you end up with `modem73.exe`.
+Or cross compile from Linux (see `packaging/windows/README.md`). Either way you end up with `modem73.exe`.
 
 ## Step 2: Launch modem73
 
@@ -230,7 +243,7 @@ Turn **Fragmentation ON** when another external application like Winlink is send
 
 Settings, presets, and the performance log are stored in `%APPDATA%\modem73\`.
 
-If you are running [modem73interface](https://github.com/RFnexus/modem73interface) for Reticulum, the interface file goes in `%USERPROFILE%\.reticulum\interfaces\`.
+If you are running the upstream [modem73interface](https://github.com/RFnexus/modem73interface) for Reticulum, the interface file goes in `%USERPROFILE%\.reticulum\interfaces\`.
 
 ## Step 7: How to connect programs
 
@@ -254,11 +267,21 @@ modem73 --control-port 8073
 
 Send `{"cmd": "get_config"}` to read the current settings, including `payload_size`, which tells you the largest frame the current mode can carry. `{"cmd": "set_config", "robust_mode": 6}` changes the mode on the fly, and the modem pushes an event to every connected client whenever anything changes.
 
-Full command list in [CONTROL_PORT.md](https://github.com/RFnexus/modem73/blob/master/CONTROL_PORT.md).
+Full command list in [CONTROL_PORT.md](https://github.com/kg9ni/modem73/blob/master/CONTROL_PORT.md).
+
+### VARA PORT (this fork)
+
+For linbpq `DRIVER=VARA`, enable the VARA command/data ports (default **8300** / **8301**):
+
+```
+modem73 --headless --callsign N0CALL --vara-port 8300
+```
+
+In the GUI: **CONFIG → Network** has **VARA Port**, **VARA Bind**, and **VARA Retries**. Port/bind need a restart; retries apply immediately. Host `RETRIES`, the GUI field, and `--vara-retries` share one connect budget. See [VARA_PORT.md](VARA_PORT.md).
 
 ### WORKING EXAMPLES
 
-[modem73interface](https://github.com/RFnexus/modem73interface) is a Reticulum interface that reads the frame size from the control port and switches frame sizes to match the traffic.
+Upstream [modem73interface](https://github.com/RFnexus/modem73interface) is a Reticulum interface that reads the frame size from the control port and switches frame sizes to match the traffic.
 
 ## Step 8: What terms mean
 
@@ -422,6 +445,10 @@ TCP port, 8001 by default, where applications send and receive packets.
 
 TCP port, 8073 by default, for the JSON control API: read SNR and channel state, change modes, or pass commands through to rigctl.
 
+**VARA Port / VARA Bind / VARA Retries** (this fork)
+
+Optional VARA-compatible host ports for linbpq. **VARA Port** is the command TCP port (`0` = off); data uses port+1. **VARA Bind** is the listen address (usually `127.0.0.1`). **VARA Retries** is the outbound CONNECT attempt budget (default 15). See [VARA_PORT.md](VARA_PORT.md).
+
 **LAN mode**
 
 Listen on every network interface instead of only localhost, so other machines on your LAN can use the modem.
@@ -434,4 +461,4 @@ A short code that packs up your modem settings. Share it so another station can 
 
 Saved sets of settings. In the config tab, s saves the current one and x deletes it.
 
-Source: https://modem73.app/quickstart.html
+Adapted from the upstream quickstart at https://modem73.app/quickstart.html for the kg9ni fork.
