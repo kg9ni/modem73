@@ -274,6 +274,10 @@ static bool apply_settings_file(const std::string& path, TNCConfig& config,
             if (v >= 1 && v <= 65535) config.port = v;
         }
         else if (!strcmp(key, "bind_address") && take(key)) config.bind_address = value;
+        else if (!strcmp(key, "control_port") && take(key)) {
+            int v = atoi(value);
+            if (v >= 0 && v <= 65535) config.control_port = v;
+        }
         else if (!strcmp(key, "control_bind_address") && take(key)) config.control_bind_address = value;
         else if (!strcmp(key, "vara_port") && take(key)) {
             int v = atoi(value);
@@ -555,6 +559,7 @@ int main(int argc, char** argv) {
         } else if (arg == "--control-port" && i + 1 < argc) {
             config.control_port = std::atoi(argv[++i]);
             cli_control_port = true;
+            cli_set.insert("control_port");
         } else if (arg == "--vara-port" && i + 1 < argc) {
             config.vara_port = std::min(65534, std::max(0, std::atoi(argv[++i])));
             cli_vara_port = true;
@@ -1372,6 +1377,30 @@ int main(int argc, char** argv) {
             !check_port_available(config.vara_bind_address, config.vara_port + 1)) {
             std::cerr << "Error: VARA ports " << config.vara_port << "/" << (config.vara_port + 1)
                       << " are already in use on " << config.vara_bind_address << std::endl;
+            bool other_modem73 = config.control_port > 0 &&
+                !check_port_available(config.control_bind_address, config.control_port);
+            if (other_modem73)
+                std::cerr << "Another modem73 appears to be running: its control port "
+                          << config.control_port << " is in use as well." << std::endl;
+            if (!g_use_ui) {
+                if (other_modem73)
+                    std::cerr << "Attach with: modem73 -A 127.0.0.1:" << config.control_port << std::endl;
+                else
+                    std::cerr << "Use --vara-port to specify a different port." << std::endl;
+                return 1;
+            }
+#ifdef WITH_UI
+            if (other_modem73) {
+                std::cerr << "\nPress Enter to attach to the running modem73, or type 'q' to quit: ";
+                std::string input;
+                if (!std::getline(std::cin, input) || input == "q" || input == "Q") {
+                    std::cerr << "Exiting." << std::endl;
+                    return 1;
+                }
+                return run_attached("127.0.0.1:" + std::to_string(config.control_port));
+            }
+#endif
+            std::cerr << "Use --vara-port to specify a different port, or stop the other process." << std::endl;
             return 1;
         }
     }
