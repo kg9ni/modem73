@@ -559,6 +559,7 @@ int main(int argc, char** argv) {
         } else if (arg == "--control-port" && i + 1 < argc) {
             config.control_port = std::atoi(argv[++i]);
             cli_control_port = true;
+            cli_set.insert("control_port");
         } else if (arg == "--vara-port" && i + 1 < argc) {
             config.vara_port = std::min(65534, std::max(0, std::atoi(argv[++i])));
             cli_vara_port = true;
